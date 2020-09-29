@@ -38,14 +38,24 @@ function getCourseInfo(id) {
   })
 }
 
-function downloadMp3(savePath, url) {
+function downloadCourseSection(courseDirPath, section, no) {
   return new Promise(async resolve => {
     try {
-      if (!url || !savePath) {
+
+      const {av,title} = section
+      const {url, fileName} = av
+      if (!url || !courseDirPath) {
+        console.warn(JSON.stringify(section))
         resolve()
         return
       }
 
+      // 文件后缀
+      const suffix = fileName.split('.')[1]
+
+      const _fileName = `${no}-${title}.${suffix}`
+
+      const savePath = path.join(courseDirPath, _fileName)
       fs.writeFileSync(savePath, await download(url))
       resolve()
     } catch (error) {
@@ -56,37 +66,50 @@ function downloadMp3(savePath, url) {
 }
 
 async function main() {
+  const courseDirRootPath = path.join('/Volumes', 'Passport','Course')
 
-  try {
-    const courseInfo = (await getCourseInfo(config.learnCourseId)).data.data
-    const courseTitle = courseInfo.title
-    console.log(`课程 - ${courseTitle}`)
-    const sectionList = (await getCourseSectionList(config.learnCourseId)).data.data
+  for (let courseId = 1; courseId < 44; courseId++) {
 
-    const courseDir = path.join('course', `${config.learnCourseId}-${courseTitle}`)
 
-    if (!fs.existsSync(courseDir)) {
-      fs.mkdirSync(courseDir)
+    try {
+      const courseInfo = (await getCourseInfo(courseId)).data.data
+      const courseTitle = courseInfo.title
+      console.log(`课程 - ${courseTitle}`)
+
+      const courseDir = path.join(courseDirRootPath, `${courseId}-${courseTitle}`)
+
+      if (!fs.existsSync(courseDir)) {
+        fs.mkdirSync(courseDir)
+      }
+
+      // 获取课程章节
+      const sectionList = (await getCourseSectionList(courseId)).data.data
+
+
+      for (let index = 0; index < sectionList.length; index++) {
+        const section = sectionList[index]
+        
+        console.log(` |- 章节${index+1} - ${section.title}`)
+        await downloadCourseSection(courseDir, section, index+1)
+      }
+      // await Promise.all(downloadJobs)
+      console.log(`🚀 下载完成`)
+      await delay(5)
+    } catch (error) {
+      console.warn('下载课程失败',courseId)
+      console.warn(error)
     }
 
-    const downloadJobs = []
-    sectionList.forEach(section => {
-      const sectionPath = path.join(courseDir, `${section.title}.mp3`)
 
-      console.log(` |- 章节 - ${section.title}`)
-      downloadJobs.push(downloadMp3(sectionPath, section.av.url))
-    })
-    console.log('')
-    console.log('⏳ 下载中')
-    await Promise.all(downloadJobs)
-    console.log(`🚀 下载完成`)
-    await delay(5)
-  } catch (error) {
-    console.warn('下载课程mp3失败')
-    console.warn(error)
   }
 
-
 }
+
+
+// function main() {
+//   const p = path.join('/Volumes', 'Passport','a')
+//   fs.mkdirSync(p)
+//   console.log('end')
+// }
 
 main()
